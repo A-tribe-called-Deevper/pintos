@@ -67,6 +67,9 @@ static void init_thread (struct thread *, const char *name, int priority);
 static void do_schedule(int status);
 static void schedule (void);
 bool cmp_PRI(struct list_elem* a, struct list_elem* b, void* aux);
+struct thread* thread_front (struct list* list);
+void thread_priority_check(void);
+
 static tid_t allocate_tid (void);
 
 /* Returns true if T appears to point to a valid thread. */
@@ -211,12 +214,11 @@ thread_create (const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
+	/* Add to run queue. */
+	thread_unblock (t);
 	if(thread_current ()->priority < t->priority) {
 		thread_yield();
 	}
-	/* Add to run queue. */
-	thread_unblock (t);
-	
 	return tid;
 }
 
@@ -252,7 +254,7 @@ void thread_awake(int64_t ticks) {
 			// list_remove returns next element
 			curNode = list_remove(curNode);
 			thread_unblock(curThread);
-			
+
 		} else {
 			curNode = list_next(curNode);
 		}
@@ -292,7 +294,7 @@ thread_unblock (struct thread *t) {
 	ASSERT (t->status == THREAD_BLOCKED);
 	// list_push_back (&ready_list, &t->elem);
 	// modified version maintain sorted list.
-	list_insert_ordered(&ready_list, &t->elem, &cmp_PRI, NULL);
+	list_insert_ordered(&ready_list, &t->elem, cmp_PRI, NULL);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -355,7 +357,7 @@ thread_yield (void) {
 
 	old_level = intr_disable ();
 	if (curr != idle_thread)
-		list_insert_ordered (&ready_list, &curr->elem, &cmp_PRI, NULL);
+		list_insert_ordered (&ready_list, &curr->elem, cmp_PRI, NULL);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
@@ -363,8 +365,13 @@ thread_yield (void) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
+	enum intr_level old_level = intr_disable();
 	thread_current ()->priority = new_priority;
-	list_sort(&ready_list, cmp_PRI, NULL);
+	if(!list_empty(&ready_list) && thread_current ()->priority < thread_front(&ready_list)->priority) {
+		thread_yield();
+	}
+	intr_set_level (old_level);
+
 }
 
 /* Returns the current thread's priority. */
@@ -648,4 +655,17 @@ cmp_PRI (struct list_elem* cur, struct list_elem* prev, void* aux) {
 	struct thread *nextThread = list_entry(prev, struct thread, elem);
 
 	return curThread->priority > nextThread->priority;
+}
+
+struct thread*
+thread_front (struct list* target) {
+	return list_entry(list_front(target), struct thread, elem);
+}
+
+void 
+thread_priority_check() {
+	
+	if(!list_empty(&ready_list) && (thread_current ()-> priority < thread_front(&ready_list)->priority)) {
+		thread_yield();
+	}
 }
