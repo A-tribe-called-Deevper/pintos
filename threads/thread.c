@@ -13,6 +13,7 @@
 #include "intrinsic.h"
 #ifdef USERPROG
 #include "userprog/process.h"
+#include "timer.c"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -27,6 +28,10 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+
+/* List of processes in THREAD_BLOCKED state, that is, processes
+   that are blocked. */
+static struct list sleep_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -105,9 +110,10 @@ thread_init (void) {
 	};
 	lgdt (&gdt_ds);
 
-	/* Init the globla thread context */
+	/* Init the global thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init (&sleep_list);
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -210,6 +216,46 @@ thread_create (const char *name, int priority,
 	return tid;
 }
 
+void thread_sleep(int64_t ticks) {
+	struct thread *curT = thread_current();
+	enum intr_level old_level;
+
+	// block interrupt
+	old_level = intr_disable ();
+
+
+	ASSERT (curT != idle_thread);
+
+	// save the tick to wake up.
+	curT->wakeup_tick = ticks;
+
+	// push to the sleep list.
+	list_push_back(&sleep_list, &curT->elem);
+	// block and schedule.
+	// we have to block here; before block the interrupt must be disabled.
+	thread_block();
+
+	intr_set_level(old_level);	
+}
+
+void thread_awake(int64_t ticks) {
+	// iterating sleep list check some process can wake up
+	struct list_elem *curNode = list_begin (&sleep_list);
+
+	while(curNode != list_end(&sleep_list)) {
+		struct thread *curThread = list_entry(curNode, struct thread, elem);
+		if(curThread->wakeup_tick <= ticks) {
+			// list_remove returns next element
+			curNode = list_remove(curNode);
+			thread_unblock(curThread);
+			
+		} else {
+			curNode = list_next(curNode);
+		}
+	}
+
+}
+
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
 
@@ -220,7 +266,7 @@ void
 thread_block (void) {
 	ASSERT (!intr_context ());
 	ASSERT (intr_get_level () == INTR_OFF);
-	thread_current ()->status = THREAD_BLOCKED;
+	thread_current ()->status = THREAD_BLOCKED;	
 	schedule ();
 }
 
