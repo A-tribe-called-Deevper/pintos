@@ -28,6 +28,10 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+#define NICE_DEFAULT 0
+#define RECENT_CPU_DEFAULT 0
+#define LOAD_AVG_DEFAULT 0
+
 bool cmp_PRI(struct list_elem* a, struct list_elem* b, void* aux);
 
 /* A kernel thread or user process.
@@ -93,11 +97,17 @@ struct thread {
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
+	int origin_priority;
+	int nice;
+	int recent_cpu;
 
+	struct lock *waiting_lock; 			/* Lock for waiting */
+	struct list donors;
 	int64_t wakeup_tick;
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
+	struct list_elem lock_elem;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -152,4 +162,13 @@ void do_iret (struct intr_frame *tf);
 struct thread* thread_front(struct list* l);
 
 void thread_priority_check(void);
+bool thread_compare_donate_priority (const struct list_elem *l, 
+				const struct list_elem *s, void *aux UNUSED);
+
+int thread_calc_priority (struct thread *t);
+void thread_recalc_priority ();
+void thread_recalc_recent_cpu();
+void thread_calc_load_avg ();
+void increase_recent_cpu ();
+
 #endif /* threads/thread.h */

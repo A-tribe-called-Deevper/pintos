@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "float-calc.h": "c",
+        "timer.h": "c"
+    }
+}

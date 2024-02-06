@@ -66,9 +66,7 @@ sema_down (struct semaphore *sema) {
 
 	old_level = intr_disable ();
 	while (sema->value == 0) {
-		//TODO: Modify inserting to priority-based.
 		list_insert_ordered(&sema->waiters, &thread_current () ->elem, cmp_PRI, NULL);
-		// list_push_back (&sema->waiters, &thread_current ()->elem);
 		thread_block ();
 	}
 	sema->value--;
@@ -111,10 +109,12 @@ sema_up (struct semaphore *sema) {
 	ASSERT (sema != NULL);
 
 	old_level = intr_disable ();
+	struct thread* next_thread;
 	if (!list_empty (&sema -> waiters)) {
-		list_sort (&sema -> waiters, cmp_PRI, 0);
-		thread_unblock (list_entry (list_pop_front (&sema->waiters),
-					struct thread, elem));
+		list_sort (&sema -> waiters, thread_compare_donate_priority, 0);
+		next_thread = list_entry (list_pop_front (&sema->waiters),
+					struct thread, elem);
+		thread_unblock (next_thread);
 	}
 	sema->value++;
 	thread_priority_check();
@@ -192,9 +192,22 @@ lock_acquire (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
+	if(thread_mlfqs) {
+		sema_down(&lock->semaphore);
+		lock->holder = thread_current ();
+		return;
+	}
+	struct thread* cur = thread_current();
+	if(lock->holder) {
+		cur->waiting_lock = lock;
+		list_insert_ordered (&(lock->holder->donors), &cur->lock_elem, cmp_PRI, 0);
+		donate_priority();
+	}
 
 	sema_down (&lock->semaphore);
-	lock->holder = thread_current ();
+	cur->waiting_lock = NULL;
+	lock->holder = cur;
+
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -226,8 +239,13 @@ void
 lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
-
 	lock->holder = NULL;
+	if(thread_mlfqs) {
+		sema_up(&lock->semaphore);
+		return;
+	}
+	reassign_priority(lock);
+	refresh_donors();
 	sema_up (&lock->semaphore);
 }
 
@@ -290,7 +308,6 @@ cond_wait (struct condition *cond, struct lock *lock) {
 
 	//TODO: modify to priority-based
 	list_insert_ordered(&cond->waiters, &waiter.elem, cmp_PRI_semaphore, NULL);
-	// list_push_back (&cond->waiters, &waiter.elem);
 	lock_release (lock);
 	sema_down (&waiter.semaphore);
 	lock_acquire (lock);
@@ -341,4 +358,74 @@ bool cmp_PRI_semaphore(const struct list_elem *a, const struct list_elem *b, voi
 	struct list_elem *ta = list_begin(&sa->semaphore.waiters);
 	struct list_elem *tb = list_begin(&sb->semaphore.waiters);
 	return cmp_PRI(ta, tb, NULL);
+}
+
+void 
+donate_priority() {
+	struct thread* curThread = thread_current ();
+
+	// lock에 홀더가 있음. 그 놈이 waiting을 하는게 있으면 타고들어가.
+	// lock에 홀더가 없으면. 그놈을 그냥 바꿔
+	struct lock* cur_lock = thread_current() ->waiting_lock;
+	ASSERT(cur_lock != NULL);
+	struct thread* c = thread_current ();
+	int i = 8;
+
+	while((i >= 0) && ((c->waiting_lock))) {
+		// modify the priority to bigger value;
+		if(!c->waiting_lock) break;
+		struct thread* lock_holder = c->waiting_lock->holder;
+		// shift to pre-locked process for nested donation.
+		lock_holder->priority = c->priority;
+		c = lock_holder;
+		i = i -1;		
+	}
+}
+
+void
+reassign_priority(struct lock *lock) {
+	
+	struct thread* cur_thread = thread_current ();
+
+	ASSERT(&cur_thread->donors != NULL);
+
+	struct list_elem *e;
+
+	for (e = list_begin (&cur_thread->donors); e != list_end (&cur_thread->donors); e = list_next (e)){
+    	struct thread *t = list_entry (e, struct thread, lock_elem);
+    	if (t->waiting_lock == lock)
+      		list_remove (&t->lock_elem);
+  	}
+
+
+	// while(curNode != list_end(&cur_thread->donors)) {
+	// 	struct thread *curThread = list_entry(curNode, struct thread, lock_elem);
+	// 	if(curThread->waiting_lock == lock) {
+	// 		list_remove (&curThread->lock_elem);
+	// 		break;
+	// 	}
+	// 	curNode = list_next(curNode);
+	// }
+
+	
+
+	// reset priority
+
+	
+
+}
+
+void refresh_donors() {
+	struct thread* cur_thread = thread_current ();
+	cur_thread->priority = cur_thread->origin_priority;
+
+	if(!list_empty (&cur_thread->donors))  {
+		list_sort(&cur_thread->donors, thread_compare_donate_priority, 0);
+		int next_priority = list_entry(list_front (&cur_thread->donors), struct thread, lock_elem)->priority;
+
+		if(next_priority > cur_thread->origin_priority) {
+			cur_thread->priority = next_priority;
+		}
+
+	}
 }

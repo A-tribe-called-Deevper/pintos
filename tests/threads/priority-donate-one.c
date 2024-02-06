@@ -13,6 +13,7 @@
 #include "tests/threads/tests.h"
 #include "threads/init.h"
 #include "threads/synch.h"
+#include "list.h"
 #include "threads/thread.h"
 
 static thread_func acquire1_thread_func;

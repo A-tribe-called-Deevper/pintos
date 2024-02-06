@@ -19,7 +19,7 @@
 
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
-
+static int64_t alarm_bar = 0;
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
@@ -124,10 +124,27 @@ timer_print_stats (void) {
 }
 
 /* Timer interrupt handler. */
+// every 1 second update load_avg, recent_cpu of all threads.
+// every 4th ticks re-calc priority of all threads.
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
+	
+	//if mlfq
+	if(thread_mlfqs) {
+		increase_recent_cpu();
+		if(ticks % 4 == 0) {
+			thread_recalc_priority();
+			
+		}
+		if(ticks % TIMER_FREQ == 0) {
+			thread_recalc_recent_cpu();
+			thread_calc_load_avg();
+		}
+		
+	}
+	
 	thread_awake(ticks);
 }
 
