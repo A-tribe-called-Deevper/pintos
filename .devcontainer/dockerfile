@@ -1,0 +1,26 @@
+# syntax=docker/dockerfile:1
+
+FROM ubuntu:20.04
+
+# Configure user
+RUN adduser pint-os \
+  && echo "" >> /home/pint-os/.bashrc \
+  && echo "# command for logging in" >> /home/pint-os/.bashrc \
+  && echo "source ~/workspace/activate" >> /home/pint-os/.bashrc
+
+# Configure locale
+RUN apt clean \
+  && apt update \
+  && apt install -y locales \
+  && locale-gen en_US.UTF-8
+
+# Install dependencies
+RUN apt clean \
+  && apt update \
+  && apt install -y software-properties-common \
+  && add-apt-repository ppa:ubuntu-toolchain-r/test \
+  && apt update \
+  && apt install -y make qemu-system-x86 git gcc-7 gdb \
+  && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 60
+
+CMD ["/bin/bash"]

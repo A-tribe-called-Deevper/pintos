@@ -1,0 +1,24 @@
+{
+  "name": "pint-os",
+  "runArgs": [
+    "--name",
+    "pint-os"
+  ],
+  "containerUser": "pint-os",
+  "build": {
+    "dockerfile": "./dockerfile",
+    "context": ".."
+  },
+  "workspaceFolder": "/home/pint-os/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=${containerWorkspaceFolder},type=bind,consistency=cached",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools-extension-pack",
+        "donjayamanne.githistory",
+        "oderwat.indent-rainbow",
+        "ms-vscode.makefile-tools"
+      ]
+    }
+  }
+}

@@ -92,8 +92,39 @@ struct thread {
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
 
+	/* for `Timer Sleep` */
+	int16_t sleep_until;                /* Tick for the thread to wake up */
+
+	/* for `Priority Scheduling`
+	PINT-OS creates a single-core environment, 
+	so there are only two situations where priority changes can occur.
+
+	1. Running thread is `blocked` due to a lock acquisition failure.
+		Before scheduling,
+		priority is `recursively` donated to the `holders` of the lock that failed to acquire.
+
+		There is no change in the priority of any other thread
+		except those `holders` during this process.
+	
+	2. Running thread `release` the lock that was acquired.
+		Before scheduling, 
+		unblock the thread with the highest priority among the `waiters`, 
+		returning the donated priority that the running thread received from those `waiters`,
+		and receiving donations `again` from other acquired locks.
+
+		There is no change in the priority of any other thread 
+		except the `running thread` during this process.
+	*/
+	struct lock *lock_to_donate;        /* Lock that the thread is waiting to acquire. */
+	struct list donor_list;             /* List of locks acquired by the thread. */
+
+	/* for `Advanced Scheduling` */
+	int nice;                           /* Niceness of the thread. */
+	int recent_cpu;                     /* How much CPU time the thread has received `recently`. */
+
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
+	struct list_elem elem_for_track;    /* List element for tracking `all` threads except `idle`. */
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -133,13 +164,21 @@ const char *thread_name (void);
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
 
+bool thread_prio_less (const struct list_elem *, const struct list_elem *,
+	void *aux UNUSED);
+void thread_remove_donor (struct lock *);
+void thread_donate_priority (void);
 int thread_get_priority (void);
 void thread_set_priority (int);
 
+void thread_update_priority (void);
 int thread_get_nice (void);
 void thread_set_nice (int);
+void thread_increase_recent_cpu (void);
 int thread_get_recent_cpu (void);
+void thread_update_recent_cpu (void);
 int thread_get_load_avg (void);
+void thread_update_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
 

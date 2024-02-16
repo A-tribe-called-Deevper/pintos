@@ -1,0 +1,115 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build",
+      "type": "shell",
+      "command": "make",
+      "options": {
+        "cwd": "${workspaceFolder}/userprog",
+        "shell": {
+          "args": [
+            "-c",
+            "-l"
+          ]
+        }
+      },
+      "presentation": {
+        "clear": true
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+    },
+    {
+      "label": "reset virtual disk",
+      "type": "shell",
+      "command": "rm filesys.dsk ; pintos-mkdisk filesys.dsk 10 && pintos --fs-disk filesys.dsk -p tests/userprog/args-single:args-single -- -f -q",
+      "options": {
+        "cwd": "${workspaceFolder}/userprog/build",
+        "shell": {
+          "args": [
+            "-c",
+            "-l"
+          ]
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "backtrace",
+      "type": "shell",
+      "command": "backtrace ${input:callStack}",
+      "options": {
+        "cwd": "${workspaceFolder}/userprog/build",
+        "shell": {
+          "args": [
+            "-c",
+            "-l"
+          ]
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "test all",
+      "type": "shell",
+      "command": "make check",
+      "options": {
+        "cwd": "${workspaceFolder}/userprog",
+        "shell": {
+          "args": [
+            "-c",
+            "-l"
+          ]
+        }
+      },
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "build"
+      ]
+    },
+    {
+      "label": "test one",
+      "type": "shell",
+      "command": "pintos --fs-disk filesys.dsk -- -q run ${input:testType}",
+      "options": {
+        "cwd": "${workspaceFolder}/userprog/build",
+        "shell": {
+          "args": [
+            "-c",
+            "-l"
+          ]
+        }
+      },
+      "group": {
+        "kind": "test",
+        "isDefault": false
+      },
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "build"
+      ]
+    },
+  ],
+  "inputs": [
+    {
+      "type": "pickString",
+      "id": "testType",
+      "description": "What tests should we run? (Check the `inputs.testType.options` in `.vscode/tasks.json` for modifications)",
+      "options": [
+        "args-single onearg"
+      ]
+    },
+    {
+      "type": "promptString",
+      "id": "callStack",
+      "description": "Call Stack",
+    }
+  ]
+}

@@ -49,6 +49,9 @@ static bool format_filesys;
 /* -q: Power off after kernel tasks complete? */
 bool power_off_when_done;
 
+/* Has the scheduler started? */
+bool scheduler_started;
+
 bool thread_tests;
 
 static void bss_init (void);
@@ -105,6 +108,8 @@ main (void) {
 	thread_start ();
 	serial_init_queue ();
 	timer_calibrate ();
+
+	scheduler_started = true;
 
 #ifdef FILESYS
 	/* Initialize file system. */

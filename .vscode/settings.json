@@ -1,0 +1,13 @@
+{
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "editor.tabSize": 4,
+  "editor.defaultFormatter": "ms-vscode.cpptools",
+  "editor.formatOnSave": true,
+  "cmake.configureOnOpen": false,
+  "[c]": {
+    "editor.formatOnSave": false,
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  }
+}
